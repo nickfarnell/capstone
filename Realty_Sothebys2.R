@@ -2,7 +2,8 @@
 #tutorial from http://thatdatatho.com/2018/12/14/an-introduction-to-scraping-real-estate-data-with-rvest-and-rselenium/
 
 url <- "https://sothebysrealty.ca/en/search-results/region-greater-vancouver-british-columbia-real-estate/tloc-1/rloc-3/ptype-condo/price-0-1000000/view-grid/show-mls/sort-featured/pp-60/status-sales"
-
+library(rvest)
+library(tidyverse)
 
 #sapply(1:965, function(x) {
 sapply(1:965, function(x) {
@@ -148,9 +149,69 @@ write.csv(SampleData, "Sample_Sothebys.csv", row.names = TRUE)
 
 
 
+BungolLink <- sapply("https://www.bungol.ca/listing/1073-concession-2-road-niagara-on-the-lake-x4732756-4085282/", as.character)
+BungolPage <- xml2::read_html(BungolLink)
+
+BungolHousePrice <- BungolPage %>% 
+  rvest::html_nodes(xpath = '//*[@class="mb-2"]') %>% 
+  rvest::html_nodes(xpath = '//*[@class="fw400 fs15 fs-sm-125"]') %>% 
+  rvest::html_text()
+
+binman::list_versions("chromedriver")
+driver <- rsDriver(browser = "chrome", port = 4236L, chromever = "84.0.4147.30")
+remDr <- driver[["client"]]
+remDr$navigate("https://www.bungol.ca/listing/1073-concession-2-road-niagara-on-the-lake-x4732756-4085282/")
+webElem <- remDr$findElement(using = 'class name', value = "mb-2")
+webElem$getElementAttribute("class")
+webElem$getElementText()
 
 
+listingDateDifference <- remDr$findElement(using = 'id', value = "listingDateDifference")
+listingDateDifference$getElementText()
 
 
+webElem2 <- remDr$findElement(using = 'id', value = "listingStatus")
+webElem2$getElementText()
+
+#####
+# converting links stored in a data.frame() as factors to character type stored in a vector df
+bun_links <- as.character( c(
+"https://www.bungol.ca/listing/4-goring-way-niagara-on-the-lake-x4840140-4184587/",
+"https://www.bungol.ca/listing/1073-concession-2-road-niagara-on-the-lake-x4732756-4085282/"
+))  
 
 
+class(bun_links)  
+
+links <- sapply(df_all$link, as.character)
+
+# initalize empty data frame where we will be storing our scraped data 
+df_all_data <- data.frame()
+head(df_all_data)
+nrow(df_all_data)
+
+# write our scraper function
+scraper <- function(bun_links) {
+  
+  # save link in url object
+  url <- bun_links
+  # parse page url
+  page <- xml2::read_html(url)
+  Sys.sleep(0.25)
+  
+  remDr$navigate(bun_links)
+  webElem <- remDr$findElement(using = 'id', value = "listingStatus")
+  hprice <- webElem$getElementText()
+  
+  webElem2 <- remDr$findElement(using = 'id', value = "listingDateDifference")
+  listingDateDifference <- webElem$getElementText()
+
+  # storing individual links in df_individual_page object
+  df_individual_page <- data.frame(price = hprice,
+                                   dif = listingDateDifference)
+                                   
+
+}
+
+# looping over all links in the vector and applying scraper function to each link
+big <- sapply(bun_links, scraper)
